@@ -1,11 +1,9 @@
 # Ireland, early October
 
-A mobile-first briefing for a couple’s Ireland trip, 30 Sep–12 Oct 2026.
+Shareable trip briefing for 30 Sep–12 Oct 2026. Draft plan, nothing booked except the flights.
 
-**Draft plan, nothing booked except the flights.** Last updated August 2026.
+**Live (GitHub Pages, after enabling Actions):** https://aauchter.github.io/ireland-october/
 
-## Share the link
+Turn Pages on under Settings → Pages → Source: GitHub Actions.
 
-Send the deployed URL. No login. Toggles stay in the browser only.
-
-Local: `npm install` then `npm run dev`
+Local: `npm install` then `npm run dev` (http://127.0.0.1:4317).
