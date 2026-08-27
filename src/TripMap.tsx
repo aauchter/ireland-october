@@ -1,4 +1,4 @@
-import { GeoJSONSource, Map as MapLibreMap, Marker, NavigationControl, Popup } from 'maplibre-gl'
+import { GeoJSONSource, LngLatBounds, Map as MapLibreMap, Marker, NavigationControl, Popup } from 'maplibre-gl'
 import { useEffect, useRef } from 'react'
 import {
   isPlaceVisible,
@@ -68,6 +68,12 @@ export function TripMap({
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right')
     mapRef.current = map
 
+    const resize = () => map.resize()
+    map.on('load', resize)
+    const ro = new ResizeObserver(resize)
+    ro.observe(wrapRef.current)
+    window.addEventListener('resize', resize)
+
     map.on('load', () => {
       map.addSource('route', {
         type: 'geojson',
@@ -96,6 +102,8 @@ export function TripMap({
     })
 
     return () => {
+      window.removeEventListener('resize', resize)
+      ro.disconnect()
       markersRef.current.forEach((m) => m.remove())
       markersRef.current = []
       map.remove()
@@ -119,25 +127,34 @@ export function TripMap({
       markersRef.current.forEach((m) => m.remove())
       markersRef.current = []
 
-      visiblePlaces(transport, saturday).forEach((place) => {
+      const shown = visiblePlaces(transport, saturday)
+      const bounds = new LngLatBounds()
+
+      shown.forEach((place) => {
+        bounds.extend([place.lng, place.lat])
         const el = document.createElement('button')
         el.type = 'button'
         el.className = `place-marker${place.id === selectedPlaceId ? ' is-active' : ''}`
         el.setAttribute('aria-label', place.name)
+        el.innerHTML = `<span class="place-marker-dot"></span><span class="place-marker-label">${place.name}</span>`
         el.addEventListener('click', (event) => {
           event.stopPropagation()
           onSelectRef.current(place.id)
         })
-        const marker = new Marker({ element: el, anchor: 'center' })
+        const marker = new Marker({ element: el, anchor: 'left' })
           .setLngLat([place.lng, place.lat])
           .setPopup(
-            new Popup({ offset: 14, closeButton: false }).setHTML(
+            new Popup({ offset: 18, closeButton: false }).setHTML(
               `<strong>${place.name}</strong><div style="font-size:12px;opacity:.75">${place.kind}</div>`,
             ),
           )
           .addTo(map)
         markersRef.current.push(marker)
       })
+
+      if (!selectedPlaceId && !bounds.isEmpty()) {
+        map.fitBounds(bounds, { padding: 56, maxZoom: 7.4, duration: 0 })
+      }
     }
 
     if (map.loaded()) apply()
@@ -153,7 +170,7 @@ export function TripMap({
   }, [selectedPlaceId])
 
   return (
-    <div className="relative overflow-hidden rounded-[22px] border border-[#d9cbb0] bg-[#d7e0d4]">
+    <div className="relative z-[3] isolate overflow-hidden rounded-[22px] border border-[#d9cbb0] bg-[#d7e0d4]">
       <div ref={wrapRef} className="h-[340px] w-full md:h-[460px]" />
       <p className="pointer-events-none absolute left-3 top-3 rounded-full bg-[color:var(--color-peat)]/88 px-3 py-1 text-[11px] tracking-wide text-[color:var(--color-cream)]">
         Tap a pin · OpenStreetMap
