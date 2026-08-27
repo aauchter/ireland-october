@@ -40,6 +40,8 @@ body::before {
 }
 
 #root {
+  position: relative;
+  z-index: 2;
   min-height: 100dvh;
 }
 
@@ -77,20 +79,47 @@ button {
 }
 
 .place-marker {
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  background: var(--color-gold);
-  border: 2px solid var(--color-cream);
-  box-shadow: 0 0 0 1px rgba(21, 32, 24, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   cursor: pointer;
+  filter: drop-shadow(0 2px 6px rgba(21, 32, 24, 0.35));
 }
 
-.place-marker.is-active {
-  width: 22px;
-  height: 22px;
+.place-marker-dot {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--color-gold);
+  border: 2px solid var(--color-peat);
+  box-shadow: 0 0 0 2px var(--color-cream);
+}
+
+.place-marker.is-active .place-marker-dot {
+  width: 18px;
+  height: 18px;
   background: var(--color-peat);
   border-color: var(--color-gold);
+}
+
+.place-marker-label {
+  max-width: 9.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  background: var(--color-peat);
+  color: var(--color-cream);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 5px 8px;
 }
 
 .gold-rule {
