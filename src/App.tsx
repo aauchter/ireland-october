@@ -4,12 +4,15 @@ import {
   isPlaceVisible,
   LINKS,
   mapsUrl,
+  placeTone,
   places,
   resolveDay,
   routeStops,
   type GalwayTransport,
   type SaturdayPath,
 } from './data'
+import { hotelStays, RATE_CHECKED, stayMaps } from './hotels'
+import { commonsFilePath, photos, type PhotoId } from './photos'
 import { TripMap } from './TripMap'
 
 const STORAGE_KEY = 'ireland-oct-2026-plan'
@@ -121,7 +124,7 @@ export default function App() {
           {transport === 'drive'
             ? 'Driving: Clonmacnoise on Friday, Athenry on Sunday. Saturday is only the loop you picked.'
             : 'Trains: no Clonmacnoise on the way. Athenry is an optional local hop from Galway. Saturday Connemara is a coach if we stay car-free.'}{' '}
-          The two Saturdays do not both happen.
+          The two Saturdays do not both happen. Unused Saturday pins stay on the map, dimmed.
         </p>
 
         <section ref={panelRef} id="day-panel" className="scroll-mt-28">
@@ -180,6 +183,17 @@ export default function App() {
                   </button>
                   {open && (
                     <div className="space-y-3 border-t border-[#d9cbb0] px-4 py-4 text-[15px] leading-relaxed">
+                      {block.placeIds.map((id) => {
+                        const place = places.find((item) => item.id === id)
+                        if (!place?.photoId) return null
+                        return (
+                          <PlacePhoto
+                            key={id}
+                            id={place.photoId}
+                            alt={`${place.name}, ${place.kind}`}
+                          />
+                        )
+                      })}
                       <p>
                         <span className="font-medium">Sleep. </span>
                         {block.sleep}
@@ -214,8 +228,13 @@ export default function App() {
                   placeId === place.id
                     ? 'border-[color:var(--color-gold)] bg-white/50'
                     : 'border-[#d9cbb0] bg-[color:var(--color-paper)]/40'
-                }`}
+                } ${placeTone(place, transport, saturday) === 'dim' ? 'opacity-55' : ''}`}
               >
+                {place.photoId && (
+                  <div className="mb-4">
+                    <PlacePhoto id={place.photoId} alt={`${place.name}, ${place.kind}`} />
+                  </div>
+                )}
                 <button
                   type="button"
                   className="text-left"
@@ -243,6 +262,8 @@ export default function App() {
             ))}
           </div>
         </section>
+
+        <Hotels />
 
         <Flights />
       </main>
@@ -431,6 +452,15 @@ function DayPanel({
       <h2 className="font-display mt-3 text-4xl leading-tight md:text-5xl">{resolved.title}</h2>
       <p className="mt-2 text-[15px] text-[#d7cbb4]">{resolved.city}</p>
       <div className="gold-rule my-6" />
+      {resolved.placeIds.map((id) => {
+        const place = places.find((item) => item.id === id)
+        if (!place?.photoId) return null
+        return (
+          <div key={id} className="mb-5">
+            <PlacePhoto id={place.photoId} alt={`${place.name}, ${place.kind}`} />
+          </div>
+        )
+      })}
       <dl className="grid gap-6 md:grid-cols-3">
         <div>
           <dt className="font-mono text-[11px] uppercase tracking-[0.16em] text-[color:var(--color-gold)]">
@@ -542,6 +572,123 @@ function LinkRow({ links, invert = false }: { links: { label: string; href: stri
         </li>
       ))}
     </ul>
+  )
+}
+
+function PlacePhoto({ id, alt }: { id: PhotoId; alt: string }) {
+  const photo = photos[id]
+  const [src, setSrc] = useState(photo.src)
+  return (
+    <figure>
+      <img
+        src={src}
+        alt={alt}
+        className="place-photo"
+        onError={() => {
+          const remote = commonsFilePath(photo.source)
+          if (src !== remote) setSrc(remote)
+        }}
+      />
+      <figcaption className="photo-credit">
+        {photo.artist} · {photo.license} ·{' '}
+        <a href={photo.source} target="_blank" rel="noreferrer" className="underline-offset-2 hover:underline">
+          Wikimedia Commons
+        </a>
+      </figcaption>
+    </figure>
+  )
+}
+
+function Hotels() {
+  return (
+    <section className="mt-14">
+      <SectionHead kicker="Where we might sleep" title="Hotels to check, nothing booked" />
+      <p className="mb-6 max-w-3xl text-[15px] leading-relaxed text-[#3f382e]">
+        Flights are held. Hotels are not. Galway is the friends’ house. Rates below are not quoted —
+        hotel widgets are login-walled or change by the hour. Each button opens the official site or
+        Booking.com with the exact stay dates ({RATE_CHECKED} snapshot: links only).
+      </p>
+      <div className="flex flex-col gap-6">
+        {hotelStays.map((stay) => (
+          <article key={stay.id} className="rounded-[22px] border border-[#d9cbb0] bg-[color:var(--color-paper)]/50 p-5 md:p-6">
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[color:var(--color-gold-dim)]">
+              {stay.nights}
+            </p>
+            <h3 className="font-display mt-1 text-2xl md:text-3xl">{stay.city}</h3>
+            <p className="mt-2 text-[15px] leading-relaxed text-[#3f382e]">{stay.why}</p>
+            {stay.friendsHouse && (
+              <p className="mt-3 text-[13px] text-[color:var(--color-stone)]">
+                No booking link. Downtown Galway — address stays off this page.
+              </p>
+            )}
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              {stay.picks.map((pick) => (
+                <div key={pick.id} className="rounded-2xl border border-[#d9cbb0] bg-white/40 p-4">
+                  {pick.photoId && (
+                    <div className="mb-3">
+                      <PlacePhoto
+                        id={pick.photoId}
+                        alt={`${pick.name}${pick.photoId === 'kilkenny' ? ' area — Kilkenny Castle' : pick.photoId === 'dublin' ? ' area — Dublin Docklands' : pick.photoId === 'dean' ? ' neighbourhood — Camden Street' : pick.photoId === 'marker' ? ' neighbourhood — Grand Canal Theatre' : ''}`}
+                      />
+                    </div>
+                  )}
+                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[color:var(--color-gold-dim)]">
+                    {pick.role === 'pick' ? 'Pick' : 'Alternative'}
+                  </p>
+                  <h4 className="font-display mt-1 text-xl">{pick.name}</h4>
+                  <p className="mt-2 text-[14px] leading-relaxed">{pick.note}</p>
+                  <p className="mt-2 text-[13px] text-[color:var(--color-stone)]">{pick.walk}</p>
+                  {pick.amexFhr && (
+                    <p className="mt-2 text-[13px] text-[color:var(--color-stone)]">
+                      Amex Fine Hotels + Resorts if booked through Amex Travel. No nightly rate on this page.
+                    </p>
+                  )}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <a
+                      href={pick.official.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex rounded-full border border-[#c4b496] bg-[color:var(--color-peat)] px-3 py-1.5 text-[13px] text-[color:var(--color-cream)]"
+                    >
+                      Official · {pick.official.label}
+                    </a>
+                    {pick.bookDirect && (
+                      <a
+                        href={pick.bookDirect.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex rounded-full border border-[#c4b496] bg-white/50 px-3 py-1.5 text-[13px]"
+                      >
+                        {pick.bookDirect.label}
+                      </a>
+                    )}
+                    <a
+                      href={pick.booking}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex rounded-full border border-[#c4b496] bg-white/50 px-3 py-1.5 text-[13px]"
+                    >
+                      Check live rate · Booking.com · {stay.dates}
+                    </a>
+                    <a
+                      href={stayMaps(pick.mapsQuery)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex rounded-full border border-[#c4b496] bg-white/50 px-3 py-1.5 text-[13px]"
+                    >
+                      Google Maps
+                    </a>
+                  </div>
+                  <p className="mt-3 text-[11px] text-[color:var(--color-stone)]">
+                    No price quoted. Open the official engine or Booking.com (as of {RATE_CHECKED}).
+                  </p>
+                </div>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   )
 }
 

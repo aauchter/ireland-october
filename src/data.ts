@@ -18,6 +18,7 @@ export type Place = {
   mapsQuery: string
   extraLinks?: Link[]
   dayId: string
+  photoId?: 'dublin' | 'galway' | 'clonmacnoise' | 'aughnanure' | 'kylemore' | 'dunguaire' | 'kilmacduagh' | 'athenry' | 'carton' | 'kilkenny'
   showWhen?: {
     transport?: GalwayTransport[]
     saturday?: SaturdayPath[]
@@ -84,6 +85,7 @@ export const places: Place[] = [
       'Landing, a quiet prep night, and the last drinking weekend. In the city we walk, use a Leap card, and take the DART — no rental car on Dublin days.',
     official: { label: 'Transport for Ireland', href: LINKS.tfi },
     mapsQuery: 'Dublin Ireland',
+    photoId: 'dublin',
     extraLinks: [
       { label: 'Leap Card', href: LINKS.leap },
       { label: 'Irish Rail', href: LINKS.irishRail },
@@ -100,6 +102,7 @@ export const places: Place[] = [
       'Arrive Thursday 1 Oct at 11:45 local. Depart Monday 12 Oct at 12:50. Leave the hotel around 9–9:30am that morning.',
     official: { label: 'Dublin Airport', href: LINKS.dubAirport },
     mapsQuery: 'Dublin Airport DUB',
+    photoId: 'dublin',
     extraLinks: [{ label: 'SFO', href: LINKS.sfo }],
     dayId: 'oct-12',
   },
@@ -113,6 +116,7 @@ export const places: Place[] = [
       'Friday and Saturday nights at a friends’ house in downtown Galway. Ask them about parking if we bring a car. One countryside day on Saturday — pick a single loop, not both coasts.',
     official: { label: 'Irish Rail · Galway Ceannt', href: LINKS.irishRailPlanner },
     mapsQuery: 'Galway city centre Ireland',
+    photoId: 'galway',
     dayId: 'oct-2',
   },
   {
@@ -126,6 +130,7 @@ export const places: Place[] = [
     hours: 'Typically 10:00–18:00 in October — check hours.',
     official: { label: 'Heritage Ireland · Clonmacnoise', href: LINKS.clonmacnoise },
     mapsQuery: 'Clonmacnoise Monastic Site',
+    photoId: 'clonmacnoise',
     extraLinks: [{ label: 'OPW Heritage Ireland', href: 'https://heritageireland.ie/' }],
     dayId: 'oct-2',
     showWhen: { transport: ['drive'] },
@@ -141,6 +146,7 @@ export const places: Place[] = [
     hours: 'OPW site — check hours before we go.',
     official: { label: 'Heritage Ireland · Aughnanure', href: LINKS.aughnanure },
     mapsQuery: 'Aughnanure Castle Oughterard',
+    photoId: 'aughnanure',
     dayId: 'oct-3',
     showWhen: { saturday: ['connemara'] },
   },
@@ -155,6 +161,7 @@ export const places: Place[] = [
     hours: 'Seasonal — check hours on the official site.',
     official: { label: 'Kylemore Abbey', href: LINKS.kylemore },
     mapsQuery: 'Kylemore Abbey Connemara',
+    photoId: 'kylemore',
     dayId: 'oct-3',
     showWhen: { saturday: ['connemara'] },
   },
@@ -169,6 +176,7 @@ export const places: Place[] = [
     hours: 'Currently closed to the public — check before we go.',
     official: { label: 'Dunguaire Castle', href: LINKS.dunguaire },
     mapsQuery: 'Dunguaire Castle Kinvara',
+    photoId: 'dunguaire',
     dayId: 'oct-3',
     showWhen: { saturday: ['south'] },
   },
@@ -183,6 +191,7 @@ export const places: Place[] = [
     hours: 'Unguided site; daylight hours. Check conditions.',
     official: { label: 'Heritage Ireland · Kilmacduagh', href: LINKS.kilmacduagh },
     mapsQuery: 'Kilmacduagh monastic site Gort',
+    photoId: 'kilmacduagh',
     dayId: 'oct-3',
     showWhen: { saturday: ['south'] },
   },
@@ -197,6 +206,7 @@ export const places: Place[] = [
     hours: 'OPW — check hours.',
     official: { label: 'Heritage Ireland · Athenry Castle', href: LINKS.athenry },
     mapsQuery: 'Athenry Castle County Galway',
+    photoId: 'athenry',
     dayId: 'oct-4',
   },
   {
@@ -209,6 +219,7 @@ export const places: Place[] = [
       'Carton Demesne, Maynooth, Co. Kildare, W23 TD98. Work summit Monday–Wednesday. Check-in Monday 5 Oct at 3:00pm. Optional breakfast Thursday 8 Oct, 8–10am, then we leave. Partner likely in a second room those nights.',
     official: { label: 'Carton House', href: LINKS.carton },
     mapsQuery: 'Carton House Maynooth W23 TD98',
+    photoId: 'carton',
     extraLinks: [
       { label: 'Fairmont listing', href: 'https://www.fairmont.com/en/hotels/county-kildare/carton-house.html' },
     ],
@@ -225,6 +236,7 @@ export const places: Place[] = [
     hours: 'Seasonal OPW site; 2026 listing ends 23 September. Check hours.',
     official: { label: 'Heritage Ireland · Maynooth Castle', href: LINKS.maynoothCastle },
     mapsQuery: 'Maynooth Castle Co Kildare',
+    photoId: 'carton',
     dayId: 'oct-6',
   },
   {
@@ -237,6 +249,7 @@ export const places: Place[] = [
       'Thursday one-nighter. Sleep in town by the castle, not out on the ring road. Castle in the afternoon or evening; then Friday train back to Heuston.',
     official: { label: 'Kilkenny Castle', href: LINKS.kilkennyCastle },
     mapsQuery: 'Kilkenny Castle Ireland',
+    photoId: 'kilkenny',
     extraLinks: [{ label: 'Irish Rail · MacDonagh', href: LINKS.irishRailPlanner }],
     dayId: 'oct-8',
   },
@@ -634,18 +647,26 @@ export const routeStops = [
   { id: 'airport', label: 'Airport', dayId: 'oct-12' },
 ] as const
 
+export function placeTone(
+  place: Place,
+  transport: GalwayTransport,
+  saturday: SaturdayPath,
+): 'full' | 'dim' | 'hidden' {
+  if (place.showWhen?.transport && !place.showWhen.transport.includes(transport)) {
+    return 'hidden'
+  }
+  if (place.showWhen?.saturday && !place.showWhen.saturday.includes(saturday)) {
+    return 'dim'
+  }
+  return 'full'
+}
+
 export function isPlaceVisible(
   place: Place,
   transport: GalwayTransport,
   saturday: SaturdayPath,
 ) {
-  if (place.showWhen?.transport && !place.showWhen.transport.includes(transport)) {
-    return false
-  }
-  if (place.showWhen?.saturday && !place.showWhen.saturday.includes(saturday)) {
-    return false
-  }
-  return true
+  return placeTone(place, transport, saturday) !== 'hidden'
 }
 
 export function resolveDay(
