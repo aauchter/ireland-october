@@ -125,3 +125,65 @@ button {
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
 }
+
+.map-dom-pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 11;
+  filter: drop-shadow(0 2px 5px rgba(21, 32, 24, 0.35));
+}
+
+.map-dom-pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #152018;
+  border: 2.5px solid #f3ead8;
+}
+
+.map-dom-pin.is-active .map-dom-pin-dot {
+  background: #c9a45a;
+  width: 18px;
+  height: 18px;
+}
+
+.map-dom-pin.is-dim {
+  opacity: 0.42;
+}
+
+.map-dom-pin-label {
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  background: #152018;
+  color: #f3ead8;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.place-photo {
+  display: block;
+  width: 100%;
+  height: 168px;
+  object-fit: cover;
+  border-radius: 14px;
+}
+
+.photo-credit {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--color-stone);
+}

@@ -1,17 +1,9 @@
+import { GeoJSONSource, LngLatBounds, Map as MapLibreMap, NavigationControl } from 'maplibre-gl'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  GeoJSONSource,
-  LngLatBounds,
-  Map as MapLibreMap,
-  Marker,
-  NavigationControl,
-  Popup,
-} from 'maplibre-gl'
-import { useEffect, useRef } from 'react'
-import {
-  isPlaceVisible,
+  placeTone,
   places,
   type GalwayTransport,
-  type Place,
   type SaturdayPath,
 } from './data'
 
@@ -30,11 +22,13 @@ type PinState = {
   selectedPlaceId: string | null
 }
 
-function visiblePlaces(transport: GalwayTransport, saturday: SaturdayPath) {
-  return places.filter((place) => isPlaceVisible(place, transport, saturday))
+type Point = { x: number; y: number }
+
+function mapPlaces(transport: GalwayTransport) {
+  return places.filter((place) => placeTone(place, transport, 'connemara') !== 'hidden')
 }
 
-function routeGeoJSON(transport: GalwayTransport) {
+function routeCoords(transport: GalwayTransport): [number, number][] {
   const dublin: [number, number] = [-6.2603, 53.3498]
   const galway: [number, number] = [-9.0568, 53.2707]
   const clonmacnoise: [number, number] = [-7.9861, 53.3267]
@@ -42,71 +36,68 @@ function routeGeoJSON(transport: GalwayTransport) {
   const carton: [number, number] = [-6.5615, 53.3785]
   const kilkenny: [number, number] = [-7.2522, 52.6541]
   const airport: [number, number] = [-6.2701, 53.4264]
-
   const west = transport === 'drive' ? [dublin, clonmacnoise, galway] : [dublin, galway]
   const east = transport === 'drive' ? [galway, athenry, dublin] : [galway, dublin]
-  const coords = [...west, ...east.slice(1), carton, kilkenny, dublin, airport]
+  return [...west, ...east.slice(1), carton, kilkenny, dublin, airport]
+}
 
+function routeGeoJSON(transport: GalwayTransport) {
   return {
-    type: 'Feature' as const,
-    properties: {},
-    geometry: { type: 'LineString' as const, coordinates: coords },
+    type: 'FeatureCollection' as const,
+    features: [
+      {
+        type: 'Feature' as const,
+        properties: {},
+        geometry: { type: 'LineString' as const, coordinates: routeCoords(transport) },
+      },
+    ],
   }
 }
 
 function placesGeoJSON(state: PinState) {
   return {
     type: 'FeatureCollection' as const,
-    features: visiblePlaces(state.transport, state.saturday).map((place) => ({
-      type: 'Feature' as const,
-      properties: {
+    features: mapPlaces(state.transport).map((place) => {
+      const tone = placeTone(place, state.transport, state.saturday)
+      return {
+        type: 'Feature' as const,
         id: place.id,
-        name: place.name,
-        kind: place.kind,
-        active: place.id === state.selectedPlaceId ? 'yes' : 'no',
-      },
-      geometry: {
-        type: 'Point' as const,
-        coordinates: [place.lng, place.lat],
-      },
-    })),
+        properties: {
+          id: place.id,
+          name: place.name,
+          kind: place.kind,
+          dim: tone === 'dim' ? 'yes' : 'no',
+          active: place.id === state.selectedPlaceId ? 'yes' : 'no',
+        },
+        geometry: { type: 'Point' as const, coordinates: [place.lng, place.lat] },
+      }
+    }),
   }
 }
 
-function pinElement(place: Place, active: boolean) {
-  const el = document.createElement('button')
-  el.type = 'button'
-  el.className = `place-marker${active ? ' is-active' : ''}`
-  el.dataset.placeId = place.id
-  el.setAttribute('aria-label', place.name)
-  const fill = active ? '#c9a45a' : '#152018'
-  el.innerHTML = `<span class="place-marker-label">${place.name}</span><svg class="place-marker-pin" viewBox="0 0 24 36" width="28" height="42" aria-hidden="true"><path fill="${fill}" stroke="#f3ead8" stroke-width="2.2" d="M12 1.6c-5.3 0-9.6 4.2-9.6 9.5 0 7.2 9.6 23.3 9.6 23.3s9.6-16.1 9.6-23.3c0-5.3-4.3-9.5-9.6-9.5z"/><circle cx="12" cy="11" r="3.3" fill="#f3ead8"/></svg>`
-  return el
+function pinBounds(transport: GalwayTransport) {
+  const pts = mapPlaces(transport)
+  const lngs = pts.map((p) => p.lng)
+  const lats = pts.map((p) => p.lat)
+  const minLng = Math.min(...lngs)
+  const maxLng = Math.max(...lngs)
+  const minLat = Math.min(...lats)
+  const maxLat = Math.max(...lats)
+  const padLng = Math.max((maxLng - minLng) * 0.14, 0.35)
+  const padLat = Math.max((maxLat - minLat) * 0.16, 0.18)
+  return {
+    west: minLng - padLng,
+    east: maxLng + padLng,
+    south: minLat - padLat,
+    north: maxLat + padLat,
+  }
 }
 
-function whenStyleReady(map: MapLibreMap, onReady: () => void) {
-  let finished = false
-  let poll = 0
-  const run = () => {
-    if (finished) return
-    try {
-      if (!map.isStyleLoaded()) return
-    } catch {
-      return
-    }
-    finished = true
-    window.clearInterval(poll)
-    onReady()
-  }
-  map.on('load', run)
-  map.on('idle', run)
-  poll = window.setInterval(run, 75)
-  run()
-  return () => {
-    finished = true
-    window.clearInterval(poll)
-    map.off('load', run)
-    map.off('idle', run)
+function projectFlat(lng: number, lat: number, width: number, height: number, transport: GalwayTransport): Point {
+  const { west, east, south, north } = pinBounds(transport)
+  return {
+    x: ((lng - west) / (east - west)) * width,
+    y: ((north - lat) / (north - south)) * height,
   }
 }
 
@@ -116,124 +107,95 @@ export function TripMap({
   selectedPlaceId,
   onSelectPlace,
 }: Props) {
-  const wrapRef = useRef<HTMLDivElement>(null)
+  const frameRef = useRef<HTMLDivElement>(null)
+  const mapElRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
-  const markersRef = useRef<Marker[]>([])
   const onSelectRef = useRef(onSelectPlace)
   const stateRef = useRef<PinState>({ transport, saturday, selectedPlaceId })
-  const syncRef = useRef<() => void>(() => {})
-  const clicksBound = useRef(false)
+  const [size, setSize] = useState({ w: 800, h: 420 })
+  const [mapReady, setMapReady] = useState(false)
+  const [tick, setTick] = useState(0)
 
   useEffect(() => {
     onSelectRef.current = onSelectPlace
   }, [onSelectPlace])
 
   useEffect(() => {
-    const container = wrapRef.current
+    stateRef.current = { transport, saturday, selectedPlaceId }
+  }, [transport, saturday, selectedPlaceId])
+
+  useEffect(() => {
+    const frame = frameRef.current
+    if (!frame) return
+    const measure = () => {
+      const rect = frame.getBoundingClientRect()
+      if (rect.width > 0 && rect.height > 0) {
+        setSize({ w: rect.width, h: rect.height })
+      }
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(frame)
+    return () => ro.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const container = mapElRef.current
     if (!container) return
 
-    const map = new MapLibreMap({
-      container,
-      style: STYLE,
-      center: [-8.1, 53.25],
-      zoom: 6.15,
-      attributionControl: { compact: true },
-    })
-    map.addControl(new NavigationControl({ showCompass: false }), 'top-right')
-    mapRef.current = map
+    let cancelled = false
+    let map: MapLibreMap | null = null
+    let clicksBound = false
 
-    const selectFromMap = (id: unknown) => {
-      if (typeof id === 'string' && id.length > 0) onSelectRef.current(id)
-    }
-
-    const bindLayerClicks = () => {
-      if (clicksBound.current) return
-      clicksBound.current = true
-      for (const layer of ['places-halo', 'places-core', 'places-label']) {
-        map.on('click', layer, (event) => {
-          selectFromMap(event.features?.[0]?.properties?.id)
+    const ensureLayers = (target: MapLibreMap) => {
+      if (!target.isStyleLoaded()) return
+      if (!target.getSource('trip-route')) {
+        target.addSource('trip-route', { type: 'geojson', data: routeGeoJSON(stateRef.current.transport) })
+        target.addLayer({
+          id: 'trip-route-glow',
+          type: 'line',
+          source: 'trip-route',
+          paint: { 'line-color': '#c9a45a', 'line-width': 8, 'line-opacity': 0.35 },
         })
-        map.on('mouseenter', layer, () => {
-          map.getCanvas().style.cursor = 'pointer'
-        })
-        map.on('mouseleave', layer, () => {
-          map.getCanvas().style.cursor = ''
+        target.addLayer({
+          id: 'trip-route-line',
+          type: 'line',
+          source: 'trip-route',
+          paint: { 'line-color': '#152018', 'line-width': 3.2, 'line-dasharray': [1.6, 1.1] },
         })
       }
-    }
-
-    const ensureLayers = () => {
-      if (!map.getSource('route')) {
-        map.addSource('route', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: [routeGeoJSON(stateRef.current.transport)] },
-        })
-        map.addLayer({
-          id: 'route-line-glow',
-          type: 'line',
-          source: 'route',
-          paint: {
-            'line-color': '#c9a45a',
-            'line-width': 6,
-            'line-opacity': 0.25,
-          },
-        })
-        map.addLayer({
-          id: 'route-line',
-          type: 'line',
-          source: 'route',
-          paint: {
-            'line-color': '#24382b',
-            'line-width': 2.4,
-            'line-dasharray': [2, 1.2],
-          },
-        })
-      }
-
-      if (!map.getSource('places')) {
-        map.addSource('places', {
-          type: 'geojson',
-          data: placesGeoJSON(stateRef.current),
-        })
-        map.addLayer({
-          id: 'places-halo',
+      if (!target.getSource('trip-places')) {
+        target.addSource('trip-places', { type: 'geojson', data: placesGeoJSON(stateRef.current) })
+        target.addLayer({
+          id: 'trip-places-halo',
           type: 'circle',
-          source: 'places',
+          source: 'trip-places',
           paint: {
-            'circle-radius': 16,
+            'circle-radius': 15,
             'circle-color': '#f3ead8',
-            'circle-opacity': 0.92,
+            'circle-opacity': ['case', ['==', ['get', 'dim'], 'yes'], 0.35, 0.95],
           },
         })
-        map.addLayer({
-          id: 'places-core',
+        target.addLayer({
+          id: 'trip-places-core',
           type: 'circle',
-          source: 'places',
+          source: 'trip-places',
           paint: {
-            'circle-radius': [
-              'case',
-              ['==', ['get', 'active'], 'yes'],
-              11,
-              8,
-            ],
-            'circle-color': [
-              'case',
-              ['==', ['get', 'active'], 'yes'],
-              '#c9a45a',
-              '#152018',
-            ],
-            'circle-stroke-width': 2.5,
+            'circle-radius': ['case', ['==', ['get', 'active'], 'yes'], 11, 8],
+            'circle-color': ['case', ['==', ['get', 'active'], 'yes'], '#c9a45a', '#152018'],
+            'circle-opacity': ['case', ['==', ['get', 'dim'], 'yes'], 0.4, 1],
+            'circle-stroke-width': 2.4,
             'circle-stroke-color': '#f3ead8',
           },
         })
-        map.addLayer({
-          id: 'places-label',
+        target.addLayer({
+          id: 'trip-places-label',
           type: 'symbol',
-          source: 'places',
+          source: 'trip-places',
           layout: {
             'text-field': ['get', 'name'],
             'text-size': 12,
-            'text-offset': [0, 1.35],
+            'text-offset': [0, 1.4],
             'text-anchor': 'top',
             'text-allow-overlap': true,
             'text-ignore-placement': true,
@@ -242,103 +204,198 @@ export function TripMap({
             'text-color': '#152018',
             'text-halo-color': '#f3ead8',
             'text-halo-width': 1.8,
+            'text-opacity': ['case', ['==', ['get', 'dim'], 'yes'], 0.45, 1],
           },
         })
-        bindLayerClicks()
+      }
+      const route = target.getSource('trip-route') as GeoJSONSource | undefined
+      route?.setData(routeGeoJSON(stateRef.current.transport))
+      const pts = target.getSource('trip-places') as GeoJSONSource | undefined
+      pts?.setData(placesGeoJSON(stateRef.current))
+      if (!clicksBound) {
+        clicksBound = true
+        for (const layer of ['trip-places-halo', 'trip-places-core', 'trip-places-label']) {
+          target.on('click', layer, (event) => {
+            const id = event.features?.[0]?.properties?.id
+            if (typeof id === 'string') onSelectRef.current(id)
+          })
+          target.on('mouseenter', layer, () => {
+            target.getCanvas().style.cursor = 'pointer'
+          })
+          target.on('mouseleave', layer, () => {
+            target.getCanvas().style.cursor = ''
+          })
+        }
       }
     }
 
-    const sync = () => {
-      if (!map.isStyleLoaded()) return
-      map.resize()
-      ensureLayers()
-
-      const state = stateRef.current
-      const routeSource = map.getSource('route') as GeoJSONSource | undefined
-      routeSource?.setData({
-        type: 'FeatureCollection',
-        features: [routeGeoJSON(state.transport)],
-      })
-      const placesSource = map.getSource('places') as GeoJSONSource | undefined
-      placesSource?.setData(placesGeoJSON(state))
-
-      markersRef.current.forEach((marker) => marker.remove())
-      markersRef.current = []
-
-      const shown = visiblePlaces(state.transport, state.saturday)
+    const fit = (target: MapLibreMap) => {
       const bounds = new LngLatBounds()
-
-      shown.forEach((place) => {
-        bounds.extend([place.lng, place.lat])
-        const el = pinElement(place, place.id === state.selectedPlaceId)
-        el.addEventListener('click', (event) => {
-          event.stopPropagation()
-          onSelectRef.current(place.id)
-        })
-        const marker = new Marker({ element: el, anchor: 'bottom', offset: [0, 2] })
-          .setLngLat([place.lng, place.lat])
-          .setPopup(
-            new Popup({ offset: 22, closeButton: false }).setHTML(
-              `<strong>${place.name}</strong><div style="font-size:12px;opacity:.75">${place.kind}</div>`,
-            ),
-          )
-          .addTo(map)
-        markersRef.current.push(marker)
-      })
-
-      if (!state.selectedPlaceId && !bounds.isEmpty()) {
-        map.fitBounds(bounds, { padding: 48, maxZoom: 7.2, duration: 0 })
+      mapPlaces(stateRef.current.transport).forEach((place) => bounds.extend([place.lng, place.lat]))
+      if (!bounds.isEmpty()) {
+        target.fitBounds(bounds, { padding: 56, maxZoom: 7.6, duration: 0 })
       }
     }
 
-    syncRef.current = sync
-    const stopReady = whenStyleReady(map, sync)
+    try {
+      map = new MapLibreMap({
+        container,
+        style: STYLE,
+        center: [-8.05, 53.15],
+        zoom: 6.4,
+        attributionControl: { compact: true },
+      })
+    } catch {
+      return () => {
+        cancelled = true
+      }
+    }
 
-    const resize = () => map.resize()
-    const ro = new ResizeObserver(resize)
+    mapRef.current = map
+    map.addControl(new NavigationControl({ showCompass: false }), 'top-right')
+
+    const onReady = () => {
+      if (cancelled || !map) return
+      try {
+        map.resize()
+        ensureLayers(map)
+        if (!stateRef.current.selectedPlaceId) fit(map)
+        setMapReady(true)
+        setTick((n) => n + 1)
+      } catch {
+        setTick((n) => n + 1)
+      }
+    }
+
+    map.on('load', onReady)
+    map.on('idle', onReady)
+    map.on('style.load', onReady)
+    map.on('move', () => setTick((n) => n + 1))
+
+    const ro = new ResizeObserver(() => {
+      map?.resize()
+      setTick((n) => n + 1)
+    })
     ro.observe(container)
-    window.addEventListener('resize', resize)
+
+    const poll = window.setInterval(() => {
+      if (map && map.isStyleLoaded()) onReady()
+    }, 250)
 
     return () => {
-      stopReady()
-      syncRef.current = () => {}
-      window.removeEventListener('resize', resize)
+      cancelled = true
+      window.clearInterval(poll)
       ro.disconnect()
-      clicksBound.current = false
-      markersRef.current.forEach((marker) => {
-        try {
-          marker.remove()
-        } catch {
-          /* MapLibre can throw if GL never initialized */
-        }
-      })
-      markersRef.current = []
       try {
-        map.remove()
+        map?.remove()
       } catch {
-        /* MapLibre throws destroy() if WebGL never came up */
+        /* WebGL never came up */
       }
       mapRef.current = null
+      setMapReady(false)
     }
   }, [])
 
   useEffect(() => {
-    stateRef.current = { transport, saturday, selectedPlaceId }
-    syncRef.current()
+    const map = mapRef.current
+    if (!map || !map.isStyleLoaded()) return
+    const route = map.getSource('trip-route') as GeoJSONSource | undefined
+    route?.setData(routeGeoJSON(transport))
+    const pts = map.getSource('trip-places') as GeoJSONSource | undefined
+    pts?.setData(placesGeoJSON({ transport, saturday, selectedPlaceId }))
+    if (selectedPlaceId) {
+      const place = places.find((item) => item.id === selectedPlaceId)
+      if (place) map.flyTo({ center: [place.lng, place.lat], zoom: 9, speed: 0.85 })
+    } else {
+      const bounds = new LngLatBounds()
+      mapPlaces(transport).forEach((place) => bounds.extend([place.lng, place.lat]))
+      if (!bounds.isEmpty()) {
+        map.fitBounds(bounds, { padding: 56, maxZoom: 7.6, duration: 400 })
+      }
+    }
+    setTick((n) => n + 1)
   }, [transport, saturday, selectedPlaceId])
 
-  useEffect(() => {
+  const shown = useMemo(() => mapPlaces(transport), [transport])
+  const route = useMemo(() => routeCoords(transport), [transport])
+
+  const project = (lng: number, lat: number): Point => {
     const map = mapRef.current
-    if (!map || !selectedPlaceId) return
-    const place = places.find((item) => item.id === selectedPlaceId)
-    if (!place) return
-    map.flyTo({ center: [place.lng, place.lat], zoom: 9.2, speed: 0.8 })
-  }, [selectedPlaceId])
+    if (map && mapReady) {
+      const point = map.project([lng, lat])
+      return { x: point.x, y: point.y }
+    }
+    return projectFlat(lng, lat, size.w, size.h, transport)
+  }
+
+  const line = route.map((coord) => {
+    const point = project(coord[0], coord[1])
+    return `${point.x},${point.y}`
+  }).join(' ')
+
+  void tick
 
   return (
-    <div className="relative z-[3] isolate overflow-hidden rounded-[22px] border border-[#d9cbb0] bg-[#d7e0d4]">
-      <div ref={wrapRef} className="h-[360px] w-full md:h-[480px]" />
-      <p className="pointer-events-none absolute left-3 top-3 z-[2] rounded-full bg-[color:var(--color-peat)]/88 px-3 py-1 text-[11px] tracking-wide text-[color:var(--color-cream)]">
+    <div
+      className="relative z-[3] isolate overflow-hidden rounded-[22px] border border-[#d9cbb0] bg-[#d7e0d4]"
+      data-pin-count={shown.length}
+      data-route-points={route.length}
+      data-map-ready={mapReady ? 'yes' : 'no'}
+    >
+      <div ref={frameRef} className="relative h-[380px] w-full md:h-[500px]">
+        <div ref={mapElRef} className="absolute inset-0 z-0" />
+        <svg
+          viewBox={`0 0 ${size.w} ${size.h}`}
+          width={size.w}
+          height={size.h}
+          className="pointer-events-none absolute inset-0 z-10 h-full w-full"
+          role="img"
+          aria-label="Ireland trip route from Dublin to Galway, Carton House, Kilkenny, and Dublin Airport"
+          data-route-layer="svg"
+        >
+          <polyline
+            points={line}
+            fill="none"
+            stroke="#c9a45a"
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.4"
+          />
+          <polyline
+            points={line}
+            fill="none"
+            stroke="#152018"
+            strokeWidth="3.2"
+            strokeDasharray="8 6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            data-route-line="yes"
+          />
+        </svg>
+        <div className="absolute inset-0 z-20">
+          {shown.map((place) => {
+            const tone = placeTone(place, transport, saturday)
+            const point = project(place.lng, place.lat)
+            const active = place.id === selectedPlaceId
+            return (
+              <button
+                key={place.id}
+                type="button"
+                className={`map-dom-pin${active ? ' is-active' : ''}${tone === 'dim' ? ' is-dim' : ''}`}
+                data-place-id={place.id}
+                aria-label={place.name}
+                style={{ left: `${point.x}px`, top: `${point.y}px` }}
+                onClick={() => onSelectPlace(place.id)}
+              >
+                <span className="map-dom-pin-label">{place.name}</span>
+                <span className="map-dom-pin-dot" />
+              </button>
+            )
+          })}
+        </div>
+      </div>
+      <p className="pointer-events-none absolute left-3 top-3 z-30 rounded-full bg-[color:var(--color-peat)]/88 px-3 py-1 text-[11px] tracking-wide text-[color:var(--color-cream)]">
         Tap a pin · OpenStreetMap
       </p>
     </div>
