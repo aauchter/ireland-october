@@ -4,7 +4,10 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: '/ireland-october/',
+  base: '/',
+  build: {
+    cssCodeSplit: false,
+  },
   server: {
     host: '0.0.0.0',
     port: 4317,
