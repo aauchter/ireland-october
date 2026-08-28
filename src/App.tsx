@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   days,
   isPlaceVisible,
@@ -10,10 +10,7 @@ import {
   type GalwayTransport,
   type SaturdayPath,
 } from './data'
-
-const TripMap = lazy(() =>
-  import('./TripMap').then((module) => ({ default: module.TripMap })),
-)
+import { TripMap } from './TripMap'
 
 const STORAGE_KEY = 'ireland-oct-2026-plan'
 
@@ -106,7 +103,7 @@ export default function App() {
         <section className="grid gap-4 py-5 md:grid-cols-2">
           <ToggleCard
             label="Galway, Fri–Sun"
-            a={{ id: 'drive', title: 'We’ll drive', note: 'Car Friday morning, drop Sunday in Dublin. Ruin stops on the M6.' }}
+            a={{ id: 'drive', title: '’ll drive', note: 'Car Friday morning, drop Sunday in Dublin. Ruin stops on the M6.' }}
             b={{ id: 'train', title: 'Train, no car', note: 'Heuston ↔ Ceannt. Skip the on-the-way ruins. Connemara by coach.' }}
             value={transport}
             onChange={setTransport}
@@ -145,20 +142,12 @@ export default function App() {
 
         <section className="mt-14">
           <SectionHead kicker="Where this goes" title="A map of the nights and the ruins" />
-          <Suspense
-            fallback={
-              <div className="flex h-[340px] items-center justify-center rounded-[22px] border border-[#d9cbb0] bg-[#d7e0d4] text-sm text-[color:var(--color-stone)] md:h-[460px]">
-                Loading the map…
-              </div>
-            }
-          >
-            <TripMap
-              transport={transport}
-              saturday={saturday}
-              selectedPlaceId={placeId}
-              onSelectPlace={selectPlace}
-            />
-          </Suspense>
+          <TripMap
+            transport={transport}
+            saturday={saturday}
+            selectedPlaceId={placeId}
+            onSelectPlace={selectPlace}
+          />
         </section>
 
         <section className="mt-14">
