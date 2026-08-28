@@ -1,38 +1,43 @@
-name: Pages
+name: Enable Pages
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
 
 jobs:
-  build:
+  enable:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm install
-      - run: npx vite build
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Enable GitHub Pages from /docs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          echo "Current Pages config:"
+          gh api "repos/${GITHUB_REPOSITORY}/pages" && exit 0
+          echo "POST workflow build_type"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/pages" \
+            -H "Accept: application/vnd.github+json" \
+            --input - <<'EOF'
+          {"build_type":"workflow"}
+          EOF
+          echo "POST legacy /docs"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/pages" \
+            -H "Accept: application/vnd.github+json" \
+            --input - <<'EOF'
+          {"source":{"branch":"main","path":"/docs"}}
+          EOF
+          echo "PUT source to /docs"
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/pages" \
+            -H "Accept: application/vnd.github+json" \
+            --input - <<'EOF'
+          {"build_type":"legacy","source":{"branch":"main","path":"/docs"}}
+          EOF
+          echo "Final Pages config:"
+          gh api "repos/${GITHUB_REPOSITORY}/pages" || true
+          exit 0
