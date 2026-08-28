@@ -103,7 +103,7 @@ export default function App() {
         <section className="grid gap-4 py-5 md:grid-cols-2">
           <ToggleCard
             label="Galway, Fri–Sun"
-            a={{ id: 'drive', title: '’ll drive', note: 'Car Friday morning, drop Sunday in Dublin. Ruin stops on the M6.' }}
+            a={{ id: 'drive', title: 'We’ll drive', note: 'Car Friday morning, drop Sunday in Dublin. Ruin stops on the M6.' }}
             b={{ id: 'train', title: 'Train, no car', note: 'Heuston ↔ Ceannt. Skip the on-the-way ruins. Connemara by coach.' }}
             value={transport}
             onChange={setTransport}
