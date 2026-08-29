@@ -18,6 +18,8 @@ export type Place = {
   mapsQuery: string
   extraLinks?: Link[]
   dayId: string
+  mapLabel?: string
+  labelSide?: 'top' | 'bottom' | 'left' | 'right'
   photoId?: 'dublin' | 'galway' | 'clonmacnoise' | 'aughnanure' | 'kylemore' | 'dunguaire' | 'kilmacduagh' | 'athenry' | 'carton' | 'kilkenny'
   showWhen?: {
     transport?: GalwayTransport[]
@@ -81,6 +83,8 @@ export const places: Place[] = [
     kind: 'City',
     lng: -6.2603,
     lat: 53.3498,
+    mapLabel: 'Dublin',
+    labelSide: 'bottom',
     blurb:
       'Landing, a quiet prep night, and the last drinking weekend. In the city we walk, use a Leap card, and take the DART — no rental car on Dublin days.',
     official: { label: 'Transport for Ireland', href: LINKS.tfi },
@@ -98,6 +102,8 @@ export const places: Place[] = [
     kind: 'Airport',
     lng: -6.2701,
     lat: 53.4264,
+    mapLabel: 'DUB airport',
+    labelSide: 'top',
     blurb:
       'Arrive Thursday 1 Oct at 11:45 local. Depart Monday 12 Oct at 12:50. Leave the hotel around 9–9:30am that morning.',
     official: { label: 'Dublin Airport', href: LINKS.dubAirport },
@@ -112,6 +118,8 @@ export const places: Place[] = [
     kind: 'City',
     lng: -9.0568,
     lat: 53.2707,
+    mapLabel: 'Galway',
+    labelSide: 'left',
     blurb:
       'Friday and Saturday nights at a friends’ house in downtown Galway. Ask them about parking if we bring a car. One countryside day on Saturday — pick a single loop, not both coasts.',
     official: { label: 'Irish Rail · Galway Ceannt', href: LINKS.irishRailPlanner },
@@ -125,6 +133,8 @@ export const places: Place[] = [
     kind: 'Monastery',
     lng: -7.9861,
     lat: 53.3267,
+    mapLabel: 'Clonmacnoise',
+    labelSide: 'top',
     blurb:
       'Early Christian monastery on the Shannon, south of Athlone off the M6. The one outbound stop if we drive Friday. About 1–1.5 hours on site. Skip Athlone Castle unless we want lunch.',
     hours: 'Typically 10:00–18:00 in October — check hours.',
@@ -141,6 +151,8 @@ export const places: Place[] = [
     kind: 'Tower house',
     lng: -9.2008,
     lat: 53.4186,
+    mapLabel: 'Aughnanure',
+    labelSide: 'left',
     blurb:
       'O’Flaherty tower house, about 25 minutes from Galway. First stop on the Connemara Saturday — mountains and a real castle, then on to Kylemore.',
     hours: 'OPW site — check hours before we go.',
@@ -156,6 +168,8 @@ export const places: Place[] = [
     kind: 'Abbey',
     lng: -9.8894,
     lat: 53.5617,
+    mapLabel: 'Kylemore',
+    labelSide: 'top',
     blurb:
       'Victorian abbey and gardens in the Connemara mountains. Full-day pairing with Aughnanure. Do not bolt the Cliffs of Moher onto this loop.',
     hours: 'Seasonal — check hours on the official site.',
@@ -171,6 +185,8 @@ export const places: Place[] = [
     kind: 'Castle',
     lng: -8.9306,
     lat: 53.1422,
+    mapLabel: 'Dunguaire',
+    labelSide: 'left',
     blurb:
       'Sixteenth-century tower house at Kinvara, about 25 minutes from Galway. South Saturday stop, same direction as the Burren. Interior has been closed to visitors — still worth seeing from outside; check the official site.',
     hours: 'Currently closed to the public — check before we go.',
@@ -186,6 +202,8 @@ export const places: Place[] = [
     kind: 'Monastic ruins',
     lng: -8.8875,
     lat: 53.0494,
+    mapLabel: 'Kilmacduagh',
+    labelSide: 'bottom',
     blurb:
       'Monastic ruins near Gort with a famously leaning round tower. Unguided OPW site, daylight hours. Pair with Dunguaire on the south loop — not with Connemara.',
     hours: 'Unguided site; daylight hours. Check conditions.',
@@ -201,6 +219,8 @@ export const places: Place[] = [
     kind: 'Castle',
     lng: -8.7447,
     lat: 53.3006,
+    mapLabel: 'Athenry',
+    labelSide: 'right',
     blurb:
       'Thirteenth-century castle with town walls and a priory. About 20 minutes east of Galway on the M6. The Sunday drive stop if we have the car (~45 min on site), then straight to Dublin. If we took the train, Athenry is a short local hop from Galway instead.',
     hours: 'OPW — check hours.',
@@ -215,6 +235,8 @@ export const places: Place[] = [
     kind: 'Hotel · summit',
     lng: -6.5615,
     lat: 53.3785,
+    mapLabel: 'Carton',
+    labelSide: 'bottom',
     blurb:
       'Carton Demesne, Maynooth, Co. Kildare, W23 TD98. Work summit Monday–Wednesday. Check-in Monday 5 Oct at 3:00pm. Optional breakfast Thursday 8 Oct, 8–10am, then we leave. Partner likely in a second room those nights.',
     official: { label: 'Carton House', href: LINKS.carton },
@@ -231,6 +253,8 @@ export const places: Place[] = [
     kind: 'Castle',
     lng: -6.5944,
     lat: 53.3809,
+    mapLabel: 'Maynooth',
+    labelSide: 'top',
     blurb:
       'Next door to Carton House if there is a gap during the summit. Norman keep of the FitzGeralds. OPW; the published 2026 season is 23 April–23 September — likely closed in October. Check hours.',
     hours: 'Seasonal OPW site; 2026 listing ends 23 September. Check hours.',
@@ -245,6 +269,8 @@ export const places: Place[] = [
     kind: 'City',
     lng: -7.2522,
     lat: 52.6541,
+    mapLabel: 'Kilkenny',
+    labelSide: 'bottom',
     blurb:
       'Thursday one-nighter. Sleep in town by the castle, not out on the ring road. Castle in the afternoon or evening; then Friday train back to Heuston.',
     official: { label: 'Kilkenny Castle', href: LINKS.kilkennyCastle },
