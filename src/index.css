@@ -128,11 +128,9 @@ button {
 
 .map-dom-pin {
   position: absolute;
-  transform: translate(-50%, -100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
   border: 0;
   padding: 0;
   background: transparent;
@@ -143,6 +141,7 @@ button {
 }
 
 .map-dom-pin-dot {
+  display: block;
   width: 16px;
   height: 16px;
   border-radius: 999px;
@@ -161,9 +160,7 @@ button {
 }
 
 .map-dom-pin-label {
-  max-width: 9rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  position: absolute;
   white-space: nowrap;
   border-radius: 999px;
   background: #152018;
@@ -172,6 +169,31 @@ button {
   font-weight: 500;
   padding: 4px 8px;
   line-height: 1;
+  pointer-events: none;
+}
+
+.map-dom-pin.label-top .map-dom-pin-label {
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.map-dom-pin.label-bottom .map-dom-pin-label {
+  top: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.map-dom-pin.label-left .map-dom-pin-label {
+  right: calc(100% + 6px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.map-dom-pin.label-right .map-dom-pin-label {
+  left: calc(100% + 6px);
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .place-photo {
