@@ -1,4 +1,4 @@
-name: Enable Pages
+name: Pages
 
 on:
   push:
@@ -8,36 +8,65 @@ on:
 permissions:
   contents: write
   pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   enable:
     runs-on: ubuntu-latest
     steps:
-      - name: Enable GitHub Pages from /docs
+      - name: Enable GitHub Pages via API
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
-          echo "Current Pages config:"
-          gh api "repos/${GITHUB_REPOSITORY}/pages" && exit 0
-          echo "POST workflow build_type"
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" >/tmp/pages.json 2>/tmp/pages.err; then
+            echo "Pages already enabled"
+            cat /tmp/pages.json
+            exit 0
+          fi
+          echo "Creating Pages site (workflow)"
           gh api --method POST "repos/${GITHUB_REPOSITORY}/pages" \
             -H "Accept: application/vnd.github+json" \
             --input - <<'EOF'
           {"build_type":"workflow"}
           EOF
-          echo "POST legacy /docs"
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/pages" \
-            -H "Accept: application/vnd.github+json" \
-            --input - <<'EOF'
-          {"source":{"branch":"main","path":"/docs"}}
-          EOF
-          echo "PUT source to /docs"
-          gh api --method PUT "repos/${GITHUB_REPOSITORY}/pages" \
-            -H "Accept: application/vnd.github+json" \
-            --input - <<'EOF'
+          STATUS=$?
+          if [ "$STATUS" -ne 0 ]; then
+            echo "Creating Pages site (docs on main)"
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/pages" \
+              -H "Accept: application/vnd.github+json" \
+              --input - <<'EOF'
           {"build_type":"legacy","source":{"branch":"main","path":"/docs"}}
           EOF
-          echo "Final Pages config:"
+          fi
           gh api "repos/${GITHUB_REPOSITORY}/pages" || true
           exit 0
+
+  build:
+    needs: enable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npx vite build --base=/ireland-october/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
