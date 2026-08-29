@@ -7,7 +7,25 @@ import {
   type SaturdayPath,
 } from './data'
 
-const STYLE = 'https://tiles.openfreemap.org/styles/liberty'
+const CARTO_STYLE = {
+  version: 8 as const,
+  name: 'CARTO Positron',
+  sources: {
+    carto: {
+      type: 'raster' as const,
+      tiles: [
+        'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+        'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+        'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+        'https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+      ],
+      tileSize: 256,
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    },
+  },
+  layers: [{ id: 'carto-light', type: 'raster' as const, source: 'carto' }],
+}
 
 type Props = {
   transport: GalwayTransport
@@ -54,27 +72,6 @@ function routeGeoJSON(transport: GalwayTransport) {
   }
 }
 
-function placesGeoJSON(state: PinState) {
-  return {
-    type: 'FeatureCollection' as const,
-    features: mapPlaces(state.transport).map((place) => {
-      const tone = placeTone(place, state.transport, state.saturday)
-      return {
-        type: 'Feature' as const,
-        id: place.id,
-        properties: {
-          id: place.id,
-          name: place.name,
-          kind: place.kind,
-          dim: tone === 'dim' ? 'yes' : 'no',
-          active: place.id === state.selectedPlaceId ? 'yes' : 'no',
-        },
-        geometry: { type: 'Point' as const, coordinates: [place.lng, place.lat] },
-      }
-    }),
-  }
-}
-
 function pinBounds(transport: GalwayTransport) {
   const pts = mapPlaces(transport)
   const lngs = pts.map((p) => p.lng)
@@ -83,8 +80,8 @@ function pinBounds(transport: GalwayTransport) {
   const maxLng = Math.max(...lngs)
   const minLat = Math.min(...lats)
   const maxLat = Math.max(...lats)
-  const padLng = Math.max((maxLng - minLng) * 0.14, 0.35)
-  const padLat = Math.max((maxLat - minLat) * 0.16, 0.18)
+  const padLng = Math.max((maxLng - minLng) * 0.18, 0.45)
+  const padLat = Math.max((maxLat - minLat) * 0.2, 0.22)
   return {
     west: minLng - padLng,
     east: maxLng + padLng,
@@ -99,6 +96,19 @@ function projectFlat(lng: number, lat: number, width: number, height: number, tr
     x: ((lng - west) / (east - west)) * width,
     y: ((north - lat) / (north - south)) * height,
   }
+}
+
+function fitPadding(width: number) {
+  const x = Math.max(72, Math.min(110, Math.round(width * 0.2)))
+  return { top: 56, bottom: 64, left: x, right: x }
+}
+
+function fitPins(target: MapLibreMap, transport: GalwayTransport) {
+  const bounds = new LngLatBounds()
+  mapPlaces(transport).forEach((place) => bounds.extend([place.lng, place.lat]))
+  if (bounds.isEmpty()) return
+  const width = target.getContainer().clientWidth || 390
+  target.fitBounds(bounds, { padding: fitPadding(width), maxZoom: 7.2, duration: 0 })
 }
 
 export function TripMap({
@@ -145,9 +155,9 @@ export function TripMap({
 
     let cancelled = false
     let map: MapLibreMap | null = null
-    let clicksBound = false
+    let fitted = false
 
-    const ensureLayers = (target: MapLibreMap) => {
+    const ensureRoute = (target: MapLibreMap) => {
       if (!target.isStyleLoaded()) return
       if (!target.getSource('trip-route')) {
         target.addSource('trip-route', { type: 'geojson', data: routeGeoJSON(stateRef.current.transport) })
@@ -155,7 +165,7 @@ export function TripMap({
           id: 'trip-route-glow',
           type: 'line',
           source: 'trip-route',
-          paint: { 'line-color': '#c9a45a', 'line-width': 8, 'line-opacity': 0.35 },
+          paint: { 'line-color': '#c9a45a', 'line-width': 8, 'line-opacity': 0.45 },
         })
         target.addLayer({
           id: 'trip-route-line',
@@ -164,85 +174,16 @@ export function TripMap({
           paint: { 'line-color': '#152018', 'line-width': 3.2, 'line-dasharray': [1.6, 1.1] },
         })
       }
-      if (!target.getSource('trip-places')) {
-        target.addSource('trip-places', { type: 'geojson', data: placesGeoJSON(stateRef.current) })
-        target.addLayer({
-          id: 'trip-places-halo',
-          type: 'circle',
-          source: 'trip-places',
-          paint: {
-            'circle-radius': 15,
-            'circle-color': '#f3ead8',
-            'circle-opacity': ['case', ['==', ['get', 'dim'], 'yes'], 0.35, 0.95],
-          },
-        })
-        target.addLayer({
-          id: 'trip-places-core',
-          type: 'circle',
-          source: 'trip-places',
-          paint: {
-            'circle-radius': ['case', ['==', ['get', 'active'], 'yes'], 11, 8],
-            'circle-color': ['case', ['==', ['get', 'active'], 'yes'], '#c9a45a', '#152018'],
-            'circle-opacity': ['case', ['==', ['get', 'dim'], 'yes'], 0.4, 1],
-            'circle-stroke-width': 2.4,
-            'circle-stroke-color': '#f3ead8',
-          },
-        })
-        target.addLayer({
-          id: 'trip-places-label',
-          type: 'symbol',
-          source: 'trip-places',
-          layout: {
-            'text-field': ['get', 'name'],
-            'text-size': 12,
-            'text-offset': [0, 1.4],
-            'text-anchor': 'top',
-            'text-allow-overlap': true,
-            'text-ignore-placement': true,
-          },
-          paint: {
-            'text-color': '#152018',
-            'text-halo-color': '#f3ead8',
-            'text-halo-width': 1.8,
-            'text-opacity': ['case', ['==', ['get', 'dim'], 'yes'], 0.45, 1],
-          },
-        })
-      }
       const route = target.getSource('trip-route') as GeoJSONSource | undefined
       route?.setData(routeGeoJSON(stateRef.current.transport))
-      const pts = target.getSource('trip-places') as GeoJSONSource | undefined
-      pts?.setData(placesGeoJSON(stateRef.current))
-      if (!clicksBound) {
-        clicksBound = true
-        for (const layer of ['trip-places-halo', 'trip-places-core', 'trip-places-label']) {
-          target.on('click', layer, (event) => {
-            const id = event.features?.[0]?.properties?.id
-            if (typeof id === 'string') onSelectRef.current(id)
-          })
-          target.on('mouseenter', layer, () => {
-            target.getCanvas().style.cursor = 'pointer'
-          })
-          target.on('mouseleave', layer, () => {
-            target.getCanvas().style.cursor = ''
-          })
-        }
-      }
-    }
-
-    const fit = (target: MapLibreMap) => {
-      const bounds = new LngLatBounds()
-      mapPlaces(stateRef.current.transport).forEach((place) => bounds.extend([place.lng, place.lat]))
-      if (!bounds.isEmpty()) {
-        target.fitBounds(bounds, { padding: 56, maxZoom: 7.6, duration: 0 })
-      }
     }
 
     try {
       map = new MapLibreMap({
         container,
-        style: STYLE,
+        style: CARTO_STYLE,
         center: [-8.05, 53.15],
-        zoom: 6.4,
+        zoom: 6.2,
         attributionControl: { compact: true },
       })
     } catch {
@@ -258,8 +199,11 @@ export function TripMap({
       if (cancelled || !map) return
       try {
         map.resize()
-        ensureLayers(map)
-        if (!stateRef.current.selectedPlaceId) fit(map)
+        ensureRoute(map)
+        if (!fitted && !stateRef.current.selectedPlaceId) {
+          fitPins(map, stateRef.current.transport)
+          fitted = true
+        }
         setMapReady(true)
         setTick((n) => n + 1)
       } catch {
@@ -268,19 +212,25 @@ export function TripMap({
     }
 
     map.on('load', onReady)
-    map.on('idle', onReady)
     map.on('style.load', onReady)
     map.on('move', () => setTick((n) => n + 1))
 
     const ro = new ResizeObserver(() => {
-      map?.resize()
+      if (!map) return
+      map.resize()
+      if (map.isStyleLoaded() && !stateRef.current.selectedPlaceId) {
+        fitPins(map, stateRef.current.transport)
+      }
       setTick((n) => n + 1)
     })
     ro.observe(container)
 
     const poll = window.setInterval(() => {
-      if (map && map.isStyleLoaded()) onReady()
-    }, 250)
+      if (map && map.isStyleLoaded()) {
+        onReady()
+        window.clearInterval(poll)
+      }
+    }, 300)
 
     return () => {
       cancelled = true
@@ -301,17 +251,11 @@ export function TripMap({
     if (!map || !map.isStyleLoaded()) return
     const route = map.getSource('trip-route') as GeoJSONSource | undefined
     route?.setData(routeGeoJSON(transport))
-    const pts = map.getSource('trip-places') as GeoJSONSource | undefined
-    pts?.setData(placesGeoJSON({ transport, saturday, selectedPlaceId }))
     if (selectedPlaceId) {
       const place = places.find((item) => item.id === selectedPlaceId)
       if (place) map.flyTo({ center: [place.lng, place.lat], zoom: 9, speed: 0.85 })
     } else {
-      const bounds = new LngLatBounds()
-      mapPlaces(transport).forEach((place) => bounds.extend([place.lng, place.lat]))
-      if (!bounds.isEmpty()) {
-        map.fitBounds(bounds, { padding: 56, maxZoom: 7.6, duration: 400 })
-      }
+      fitPins(map, transport)
     }
     setTick((n) => n + 1)
   }, [transport, saturday, selectedPlaceId])
@@ -328,16 +272,18 @@ export function TripMap({
     return projectFlat(lng, lat, size.w, size.h, transport)
   }
 
-  const line = route.map((coord) => {
-    const point = project(coord[0], coord[1])
-    return `${point.x},${point.y}`
-  }).join(' ')
+  const line = route
+    .map((coord) => {
+      const point = project(coord[0], coord[1])
+      return `${point.x},${point.y}`
+    })
+    .join(' ')
 
   void tick
 
   return (
     <div
-      className="relative z-[3] isolate overflow-hidden rounded-[22px] border border-[#d9cbb0] bg-[#d7e0d4]"
+      className="relative z-[3] isolate overflow-hidden rounded-[22px] border border-[#d9cbb0] bg-[#e8e4dc]"
       data-pin-count={shown.length}
       data-route-points={route.length}
       data-map-ready={mapReady ? 'yes' : 'no'}
@@ -378,17 +324,18 @@ export function TripMap({
             const tone = placeTone(place, transport, saturday)
             const point = project(place.lng, place.lat)
             const active = place.id === selectedPlaceId
+            const side = place.labelSide ?? 'top'
             return (
               <button
                 key={place.id}
                 type="button"
-                className={`map-dom-pin${active ? ' is-active' : ''}${tone === 'dim' ? ' is-dim' : ''}`}
+                className={`map-dom-pin label-${side}${active ? ' is-active' : ''}${tone === 'dim' ? ' is-dim' : ''}`}
                 data-place-id={place.id}
                 aria-label={place.name}
                 style={{ left: `${point.x}px`, top: `${point.y}px` }}
                 onClick={() => onSelectPlace(place.id)}
               >
-                <span className="map-dom-pin-label">{place.name}</span>
+                <span className="map-dom-pin-label">{place.mapLabel ?? place.name}</span>
                 <span className="map-dom-pin-dot" />
               </button>
             )
@@ -396,7 +343,7 @@ export function TripMap({
         </div>
       </div>
       <p className="pointer-events-none absolute left-3 top-3 z-30 rounded-full bg-[color:var(--color-peat)]/88 px-3 py-1 text-[11px] tracking-wide text-[color:var(--color-cream)]">
-        Tap a pin · OpenStreetMap
+        Tap a pin · CARTO / OSM
       </p>
     </div>
   )
