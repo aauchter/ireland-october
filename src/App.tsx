@@ -577,6 +577,7 @@ function LinkRow({ links, invert = false }: { links: { label: string; href: stri
 
 function PlacePhoto({ id, alt }: { id: PhotoId; alt: string }) {
   const photo = photos[id]
+  const remote = commonsFilePath(photo.source)
   const [src, setSrc] = useState(photo.src)
   return (
     <figure>
@@ -585,7 +586,6 @@ function PlacePhoto({ id, alt }: { id: PhotoId; alt: string }) {
         alt={alt}
         className="place-photo"
         onError={() => {
-          const remote = commonsFilePath(photo.source)
           if (src !== remote) setSrc(remote)
         }}
       />
