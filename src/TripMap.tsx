@@ -6,25 +6,26 @@ import {
   type GalwayTransport,
   type SaturdayPath,
 } from './data'
+import { PIN_COPY } from './mapPins'
 
 const CARTO_STYLE = {
   version: 8 as const,
-  name: 'CARTO Positron',
+  name: 'CARTO Voyager',
   sources: {
     carto: {
       type: 'raster' as const,
       tiles: [
-        'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        'https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+        'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+        'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+        'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+        'https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
       ],
       tileSize: 256,
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
     },
   },
-  layers: [{ id: 'carto-light', type: 'raster' as const, source: 'carto' }],
+  layers: [{ id: 'carto-voyager', type: 'raster' as const, source: 'carto' }],
 }
 
 type Props = {
@@ -324,7 +325,8 @@ export function TripMap({
             const tone = placeTone(place, transport, saturday)
             const point = project(place.lng, place.lat)
             const active = place.id === selectedPlaceId
-            const side = place.labelSide ?? 'top'
+            const side = PIN_COPY[place.id]?.side ?? place.labelSide ?? 'top'
+            const label = PIN_COPY[place.id]?.label ?? place.mapLabel ?? place.name
             return (
               <button
                 key={place.id}
@@ -335,7 +337,7 @@ export function TripMap({
                 style={{ left: `${point.x}px`, top: `${point.y}px` }}
                 onClick={() => onSelectPlace(place.id)}
               >
-                <span className="map-dom-pin-label">{place.mapLabel ?? place.name}</span>
+                <span className="map-dom-pin-label">{label}</span>
                 <span className="map-dom-pin-dot" />
               </button>
             )

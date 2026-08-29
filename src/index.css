@@ -173,25 +173,25 @@ button {
 }
 
 .map-dom-pin.label-top .map-dom-pin-label {
-  bottom: calc(100% + 5px);
+  bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
 }
 
 .map-dom-pin.label-bottom .map-dom-pin-label {
-  top: calc(100% + 5px);
+  top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
 }
 
 .map-dom-pin.label-left .map-dom-pin-label {
-  right: calc(100% + 6px);
+  right: calc(100% + 10px);
   top: 50%;
   transform: translateY(-50%);
 }
 
 .map-dom-pin.label-right .map-dom-pin-label {
-  left: calc(100% + 6px);
+  left: calc(100% + 10px);
   top: 50%;
   transform: translateY(-50%);
 }
